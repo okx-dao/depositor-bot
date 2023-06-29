@@ -30,6 +30,18 @@ DEPOSIT_SECURITY_MODULE = {
     Network.Görli: "0xed23ad3ea5fb9d10e7371caef1b141ad1c23a80c",
 }
 
+DAWN_DEPOSIT_SECURITY_MODULE = {
+    Network.Görli: "0xdb833bce275cecf2cb65b23bf5035de7a9076d01",
+}
+
+DAWN_DEPOSIT = {
+    Network.Görli: "0x9a8E4ae2fAd1f196a80d28bE375D0147FD8e4846",
+}
+
+DAWN_DEPOSIT_NODE_MANAGER = {
+    Network.Görli: "0x1E4f4fd4513dCE5FdD51e7e00c9ea0Ca093986cD",
+}
+
 FLASHBOTS_RPC = {
     Network.Mainnet: "https://relay.flashbots.net",
     Network.Görli: "https://relay-goerli.flashbots.net",

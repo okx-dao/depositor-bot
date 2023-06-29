@@ -6,7 +6,7 @@ from brownie import chain, web3
 from web3.exceptions import BlockNotFound
 
 from scripts.pauser_utils.kafka import PauseBotMsgRecipient
-from scripts.utils.interfaces import DepositSecurityModuleInterface
+from scripts.utils.interfaces import DawnDepositSecurityModuleInterface
 from scripts.utils.metrics import CREATING_TRANSACTIONS, BUILD_INFO
 from scripts.utils import variables
 
@@ -46,7 +46,7 @@ class DepositPauseBot:
         del self.kafka
 
     def _load_constants(self):
-        self.blocks_till_pause_is_valid = DepositSecurityModuleInterface.getPauseIntentValidityPeriodBlocks()
+        self.blocks_till_pause_is_valid = DawnDepositSecurityModuleInterface.getPauseIntentValidityPeriodBlocks()
         logger.info({
             'msg': f'Call `getPauseIntentValidityPeriodBlocks()`.',
             'value': self.blocks_till_pause_is_valid
@@ -84,7 +84,7 @@ class DepositPauseBot:
         self._current_block = web3.eth.get_block('latest')
         logger.info({'msg': f'Fetch `latest` block.', 'value': self._current_block.number})
 
-        self.protocol_is_paused = DepositSecurityModuleInterface.isPaused(
+        self.protocol_is_paused = DawnDepositSecurityModuleInterface.isPaused(
             block_identifier=self._current_block.hash.hex(),
         )
         logger.info({'msg': f'Call `isPaused()`.', 'value': self.protocol_is_paused})
@@ -116,8 +116,10 @@ class DepositPauseBot:
 
             logger.info({'msg': 'Creating tx in blockchain.'})
             try:
-                result = DepositSecurityModuleInterface.pauseDeposits(
+                result = DawnDepositSecurityModuleInterface.setValidatorUnsafe(
                     message['blockNumber'],
+                    message['index'],
+                    message['slashAmount'],
                     (message['signature']['r'], message['signature']['_vs']),
                     {
                         'priority_fee': priority_fee,

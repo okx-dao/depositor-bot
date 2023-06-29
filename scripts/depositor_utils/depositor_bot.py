@@ -11,10 +11,10 @@ from web3.types import TxParams
 
 from scripts.depositor_utils.kafka import DepositBotMsgRecipient
 from scripts.utils.interfaces import (
-    DepositSecurityModuleInterface,
     DepositContractInterface,
-    NodeOperatorsRegistryInterface,
-    LidoInterface,
+    DawnDepositNodeManagerInterface,
+    DawnDepositSecurityModuleInterface,
+    DawnDepositInterface,
 )
 from scripts.utils.metrics import (
     ACCOUNT_BALANCE,
@@ -30,7 +30,6 @@ from scripts.utils.metrics import (
 )
 from scripts.utils import variables
 from scripts.utils.gas_strategy import GasFeeStrategy
-
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +73,10 @@ class DepositorBot:
         )
 
     def _load_constants(self):
-        self.min_signs_to_deposit = DepositSecurityModuleInterface.getGuardianQuorum()
+        self.min_signs_to_deposit = DawnDepositSecurityModuleInterface.getGuardianQuorum()
         logger.info({'msg': f'Call `getGuardianQuorum()`.', 'value': self.min_signs_to_deposit})
 
-        self.deposit_prefix = DepositSecurityModuleInterface.ATTEST_MESSAGE_PREFIX()
+        self.deposit_prefix = DawnDepositSecurityModuleInterface.ATTEST_MESSAGE_PREFIX()
         logger.info({'msg': 'Call `ATTEST_MESSAGE_PREFIX()`.', 'value': str(self.deposit_prefix)})
 
         if variables.CREATE_TRANSACTIONS:
@@ -135,7 +134,16 @@ class DepositorBot:
         self.deposit_root = DepositContractInterface.get_deposit_root(block_identifier=self._current_block.hash.hex())
         logger.info({'msg': f'Call `get_deposit_root()`.', 'value': str(self.deposit_root)})
 
-        self.keys_op_index = NodeOperatorsRegistryInterface.getKeysOpIndex(block_identifier=self._current_block.hash.hex())
+        statuses = []
+        _, _, statuses = DawnDepositNodeManagerInterface.getNodeValidators(
+            startIndex=0, amount=0, block_identifier=self._current_block.hash.hex())
+
+        num = 0
+        for i in range(statuses.length):
+            if statuses[i] == 1:
+                num+=1
+                continue
+        self.keys_op_index = num
         logger.info({'msg': f'Call `getKeysOpIndex()`.', 'value': self.keys_op_index})
 
         self.kafka.update_messages()
@@ -161,9 +169,9 @@ class DepositorBot:
             logger.info({'msg': 'Check account balance. No account provided.'})
 
         current_gas_fee = web3.eth.get_block('pending').baseFeePerGas
-        
+
         # Lido contract buffered ether check
-        buffered_ether = LidoInterface.getBufferedEther(block_identifier=self._current_block.hash.hex())
+        buffered_ether = DawnDepositInterface.getBufferedEther(block_identifier=self._current_block.hash.hex())
         logger.info({'msg': 'Call `getBufferedEther()`.', 'value': buffered_ether})
         BUFFERED_ETHER.set(buffered_ether)
 
@@ -180,7 +188,7 @@ class DepositorBot:
         recommended_gas_fee = self.gas_fee_strategy.get_recommended_gas_fee((
             (variables.GAS_FEE_PERCENTILE_DAYS_HISTORY_1, variables.GAS_FEE_PERCENTILE_1),
             (variables.GAS_FEE_PERCENTILE_DAYS_HISTORY_2, variables.GAS_FEE_PERCENTILE_2),
-        ), force = is_high_buffer)
+        ), force=is_high_buffer)
 
         GAS_FEE.labels('max_fee').set(variables.MAX_GAS_FEE)
         GAS_FEE.labels('current_fee').set(current_gas_fee)
@@ -205,21 +213,21 @@ class DepositorBot:
             deposit_issues.append(self.GAS_FEE_HIGHER_THAN_RECOMMENDED)
 
         # Security module check
-        can_deposit = DepositSecurityModuleInterface.canDeposit(block_identifier=self._current_block.hash.hex())
+        can_deposit = DawnDepositSecurityModuleInterface.canDeposit(block_identifier=self._current_block.hash.hex())
         logger.info({'msg': 'Call `canDeposit()`.', 'value': can_deposit})
         if not can_deposit:
             logger.warning({'msg': self.DEPOSIT_SECURITY_ISSUE, 'value': can_deposit})
             deposit_issues.append(self.DEPOSIT_SECURITY_ISSUE)
-
-        # Check that contract has unused operators keys
-        avail_keys = NodeOperatorsRegistryInterface.assignNextSigningKeys.call(1, {'from': LidoInterface.address})[0]
-        has_keys = bool(avail_keys)
-        OPERATORS_FREE_KEYS.set(1 if has_keys else 0)
-        logger.info({'msg': 'Call `getNodeOperator()` and `getNodeOperatorsCount()`. Value is free keys', 'value': has_keys})
-
-        if not has_keys:
-            logger.warning({'msg': self.LIDO_CONTRACT_HAS_NO_FREE_SUBMITTED_KEYS, 'value': has_keys})
-            deposit_issues.append(self.LIDO_CONTRACT_HAS_NO_FREE_SUBMITTED_KEYS)
+        #
+        # # # Check that contract has unused operators keys
+        # # avail_keys = NodeOperatorsRegistryInterface.assignNextSigningKeys.call(1, {'from': LidoInterface.address})[0]
+        # # has_keys = bool(avail_keys)
+        # # OPERATORS_FREE_KEYS.set(1 if has_keys else 0)
+        # # logger.info({'msg': 'Call `getNodeOperator()` and `getNodeOperatorsCount()`. Value is free keys', 'value': has_keys})
+        # #
+        # # if not has_keys:
+        # #     logger.warning({'msg': self.LIDO_CONTRACT_HAS_NO_FREE_SUBMITTED_KEYS, 'value': has_keys})
+        # #     deposit_issues.append(self.LIDO_CONTRACT_HAS_NO_FREE_SUBMITTED_KEYS)
 
         # Check all signs
         # self._get_deposit_params()
@@ -263,16 +271,16 @@ class DepositorBot:
         logger.info({'msg': 'Creating tx in blockchain.'})
 
         contract = web3.eth.contract(
-            address=DepositSecurityModuleInterface.address,
-            abi=DepositSecurityModuleInterface.abi,
+            address=DawnDepositSecurityModuleInterface.address,
+            abi=DawnDepositSecurityModuleInterface.abi,
         )
 
         try:
             func = contract.functions.depositBufferedEther(
-                self.deposit_root,
-                self.keys_op_index,
                 deposit_params['block_num'],
                 deposit_params['block_hash'],
+                self.deposit_root,
+                [self.keys_op_index],
                 deposit_params['signs'],
             )
 
@@ -282,7 +290,7 @@ class DepositorBot:
 
             tx: TxParams = {
                 "from": variables.ACCOUNT.address,
-                "to": DepositSecurityModuleInterface.address,
+                "to": DawnDepositSecurityModuleInterface.address,
                 "gas": variables.CONTRACT_GAS_LIMIT,
                 "maxFeePerGas": web3.eth.get_block('pending').baseFeePerGas * 2 + priority,
                 "maxPriorityFeePerGas": priority,

@@ -41,7 +41,7 @@ class KafkaMsgRecipient:
             'group.id': kafka_topic + f'-{client}-group',
             'bootstrap.servers': KAFKA_BROKER_ADDRESS_1,
             'auto.offset.reset': 'earliest',
-            'security.protocol': 'SASL_SSL',
+            'security.protocol': 'sasl_plaintext',
             'session.timeout.ms': 240000,
             'sasl.mechanisms': 'PLAIN',
             'sasl.username': KAFKA_USERNAME,

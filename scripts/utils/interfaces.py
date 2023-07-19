@@ -12,4 +12,4 @@ DepositContractInterface = interface.DepositContract(DEPOSIT_CONTRACT[WEB3_CHAIN
 DawnDepositSecurityModuleInterface = interface.DawnDepositSecurityModule(
     DAWN_DEPOSIT_SECURITY_MODULE[WEB3_CHAIN_ID], owner=ACCOUNT)
 DawnDepositInterface = interface.DawnDeposit(DAWN_DEPOSIT[WEB3_CHAIN_ID], owner=ACCOUNT)
-DawnDepositNodeManagerInterface = interface.DawnDeposit(DAWN_DEPOSIT_NODE_MANAGER[WEB3_CHAIN_ID], owner=ACCOUNT)
+DawnDepositNodeManagerInterface = interface.DawnDepositNodeManager(DAWN_DEPOSIT_NODE_MANAGER[WEB3_CHAIN_ID], owner=ACCOUNT)

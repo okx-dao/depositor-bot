@@ -134,16 +134,15 @@ class DepositorBot:
         self.deposit_root = DepositContractInterface.get_deposit_root(block_identifier=self._current_block.hash.hex())
         logger.info({'msg': f'Call `get_deposit_root()`.', 'value': str(self.deposit_root)})
 
-        statuses = []
         _, _, statuses = DawnDepositNodeManagerInterface.getNodeValidators(
-            startIndex=0, amount=0, block_identifier=self._current_block.hash.hex())
+            0, 0, block_identifier=self._current_block.hash.hex())
 
-        num = 0
-        for i in range(statuses.length):
+        self.keys_op_index = len(statuses)
+        for i in range(len(statuses)):
+            logger.info({'msg': f'Call `getNodeValidators()`.', 'value': statuses})
             if statuses[i] == 1:
-                num+=1
-                continue
-        self.keys_op_index = num
+                self.keys_op_index = i
+                break
         logger.info({'msg': f'Call `getKeysOpIndex()`.', 'value': self.keys_op_index})
 
         self.kafka.update_messages()
@@ -355,6 +354,7 @@ class DepositorBot:
         for block_num, blocks_by_number in dict_for_sort.items():
             for block_hash, block_messages in blocks_by_number.items():
 
+                logger.info({'msg': f'block_messages ready.', 'value': len(block_messages)})
                 max_quorum = max(len(block_messages), max_quorum)
                 if len(block_messages) >= self.min_signs_to_deposit:
                     # Take the oldest messages to prevent reorganizations
